@@ -1,0 +1,2 @@
+https://script.google.com/macros/s/ВСТАВЬ_АДРЕС/exec
+ВСТАВЬ_KEY_ТОТ_ЖЕ_ЧТО_В_SCRIPT_PROPERTIES
