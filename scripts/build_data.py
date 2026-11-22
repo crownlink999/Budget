@@ -65,6 +65,7 @@ KINDS = {
     'exec': dict(
         key=['code', 'name'],
         fields=[
+            ('old', r'^код товара sap \(бюджет\)', None, s, True),  # старый код (как был в бюджете); в data.json идёт последним
             ('code', r'новый код товара', None, s),
             ('name', r'^наименование', 'code', s),
             ('unit', r'^ед\.? ?изм', 'code', s),
@@ -79,8 +80,9 @@ KINDS = {
             ('sup', r'^наименование поставщика', 'open', s),
             ('cdate', r'^дата договора', 'sup', d),
         ],
-        out=['code', 'name', 'unit', 'cust', 'qty', 'sum', 'meth', 'st1', 'st2', 'open', 'sup', 'cdate'],
+        out=['code', 'name', 'unit', 'cust', 'qty', 'sum', 'meth', 'st1', 'st2', 'open', 'sup', 'cdate', 'old'],
         canon=['meth', 'st1', 'st2'],
+        blank_same_old=True,
     ),
     'plan': dict(
         key=['code', 'name'],  # у работ и услуг кода товара нет, есть только наименование
@@ -255,6 +257,11 @@ def read_kind(kind, ws, first, pos):
         best = {k: v.most_common(1)[0][0] for k, v in cnt.items()}
         for row in out:
             row[c] = best[low(row[c])]
+    if cfg.get('blank_same_old'):  # старый код такой же, как новый: не храним
+        ic, io = cfg['out'].index('code'), cfg['out'].index('old')
+        for row in out:
+            if low(row[io]) == low(row[ic]):
+                row[io] = ''
     return out
 
 

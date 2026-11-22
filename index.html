@@ -75,18 +75,33 @@ main{max-width:820px;margin:0 auto;padding:12px 12px 0}
 .lhead .stat{margin:0}
 .copybtn{border:0;background:var(--teal);color:#fff;border-radius:11px;padding:10px 16px;font-weight:700;font-size:14px}
 .copybtn:active{background:var(--teal-d)}
-.copybtn.done{background:var(--ok)}
+.copybtn.alt{background:var(--teal-l);color:var(--teal-d)}
+.copybtn.alt:active{background:#C3E4E6}
+.copybtn.done,.copybtn.alt.done{background:var(--ok);color:#fff}
+.cbtns{display:flex;flex-wrap:wrap;gap:8px}
 .empty,.loading{background:var(--surface);border:1px dashed #B9C9D2;border-radius:14px;padding:26px 18px;text-align:center;color:var(--muted)}
 .empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:6px}
 .empty button{margin-top:12px;border:0;background:var(--teal);color:#fff;border-radius:10px;padding:10px 18px;font-weight:600}
 .g{background:var(--surface);border:1px solid var(--line);border-radius:16px;margin-bottom:10px;overflow:hidden}
-.gm{display:block;width:100%;text-align:left;background:none;border:0;padding:12px 14px 10px}
+.gm{display:block;width:100%;text-align:left;background:none;border:0;padding:12px 14px 10px;color:inherit;
+  -webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+.gm *{-webkit-user-select:text;user-select:text}
+.gm .cp{-webkit-user-select:none;user-select:none}
 .g.open .gm{background:#F4F8FA}
 .gh{display:flex;gap:12px;align-items:flex-start}
 .gh .l{flex:1;min-width:0}
 .code{font:600 12.5px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--teal-d);
   background:var(--teal-l);padding:2px 7px;border-radius:6px;display:inline-block;letter-spacing:.2px}
 .code.nc{background:#EEF1F3;color:#6A7A86}
+.code.old{background:#F1EDE3;color:#7A5A12}
+.cl{display:flex;flex-wrap:wrap;align-items:center;gap:3px 4px}
+.oldc{display:inline-flex;align-items:center;gap:2px;margin-left:8px;font-size:12px;color:var(--muted)}
+.oldc i{font-style:normal;margin-right:3px}
+.cp{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:24px;height:24px;border:0;border-radius:7px;background:transparent;color:#7C93A0;padding:0}
+.cp svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.cp:hover{background:#E1EBF0;color:var(--teal-d)}
+.cp.done{color:var(--ok)}
+@media (pointer:coarse){.cp{width:30px;height:30px}}
 .name{margin:6px 0 0;font-size:15px;font-weight:560;word-break:break-word}
 .name.dim{color:var(--muted);font-weight:500}
 .qty{text-align:right;flex:0 0 auto;max-width:44%}
@@ -144,7 +159,7 @@ mark{background:#FFE08A;color:inherit;border-radius:3px;padding:0 1px}
 <script>
 (function(){
 'use strict';
-var APP_BUILD={v:'2',t:'21.11.2026'};
+var APP_BUILD={v:'3',t:'22.11.2026'};
 var YEARS=['2026','2027'];
 var LOOK={a:'а',c:'с',e:'е',o:'о',p:'р',x:'х',y:'у',k:'к',m:'м',t:'т',b:'в',h:'н','ё':'е'};
 function norm(s){return String(s==null?'':s).toLowerCase().replace(/[acepoxykmtbhё]/g,function(c){return LOOK[c]})}
@@ -160,12 +175,42 @@ function statusCls(st){
 function split(v){return v?String(v).split(/\s*;\s*/).filter(Boolean):[]}
 function one(i){return function(r){return r[i]?[r[i]]:[]}}
 function validCode(c){return /\d/.test(c||'')}
-/* коды для связи между разделами: новый, а если его нет, то старый */
-function codeKeys(T,r){var a=[];[r[T.code],T.old!=null?r[T.old]:''].forEach(function(c){if(validCode(c)&&a.indexOf(c)<0)a.push(c)});return a}
-function codeShow(T,r){
+/* Старый и новый код одного товара. Связь берём из строк, где оба кода есть (исполнение, ПТД), и применяем ко всем разделам */
+var OLD2NEW={},NEW2OLD={};
+function buildAlt(){
+  OLD2NEW={};NEW2OLD={};
+  TABS.forEach(function(T){
+    if(T.old==null)return;
+    Y[T.id].forEach(function(r){
+      var n=r[T.code],o=r[T.old];
+      if(validCode(n)&&validCode(o)&&n!==o){
+        if(!OLD2NEW[o])OLD2NEW[o]=n;
+        var a=NEW2OLD[n]||(NEW2OLD[n]=[]);if(a.indexOf(o)<0)a.push(o);
+      }
+    });
+  });
+}
+/* основной код строки: новый, а если его нет, то старый */
+function codeRaw(T,r){
   var c=r[T.code];if(validCode(c))return c;
-  var o=T.old!=null?r[T.old]:'';if(validCode(o))return 'ст. '+o;
-  return c||'';
+  var o=T.old!=null?r[T.old]:'';return validCode(o)?o:'';
+}
+/* все коды товара для поиска и связи между разделами */
+function codeKeys(T,r){
+  var a=[];
+  function add(c){if(validCode(c)&&a.indexOf(c)<0)a.push(c)}
+  add(r[T.code]);if(T.old!=null)add(r[T.old]);
+  a.slice().forEach(function(c){add(OLD2NEW[c]);(NEW2OLD[c]||[]).forEach(add)});
+  return a;
+}
+/* что показать рядом с кодом: старый код (если основной новый) или новый код (если основной старый) */
+function altInfo(T,r){
+  var p=codeRaw(T,r);if(!p)return null;
+  var o=T.old!=null?r[T.old]:'';
+  if(validCode(o)&&o!==p)return {lab:'ст. код',codes:[o]};
+  if(NEW2OLD[p])return {lab:'ст. код',codes:NEW2OLD[p].slice(0,3)};
+  if(OLD2NEW[p])return {lab:'нов. код',codes:[OLD2NEW[p]]};
+  return null;
 }
 
 /* ---------- описание трёх вкладок года ----------
@@ -173,13 +218,13 @@ function codeShow(T,r){
    tags: плашки под наименованием; det: подробности; filt: выпадающие фильтры */
 var TABS=[
   {id:'exec',t:'1-Исполнение',s:'закупки, договоры',
-   code:0,name:1,unit:2,qty:4,sum:5,search:[0,1,3,6,7,8,10],
+   code:0,old:12,name:1,unit:2,qty:4,sum:5,search:[0,1,3,6,7,8,10,12],
    tags:function(r){var a=[];split(r[3]).forEach(function(c){a.push(['ini',c])});
      if(r[6])a.push(['plan',r[6]]);
      if(r[7])a.push([statusCls(r[7]),'заявка: '+r[7]]);
      if(r[8])a.push([statusCls(r[8]),'закупка: '+r[8]]);return a},
    det:[['Заказчик',3],['Способ закупок',6],['Статус заявки',7],['Статус закупки',8],['Дата вскрытия',9,'d'],['Поставщик',10],['Дата договора',11,'d']],
-   cols:[['Код товара',0],['Наименование',1],['Ед. изм.',2],['Заказчик',3],['Кол-во',4,'n'],['Сумма, ₸ без НДС',5,'n'],['Способ закупок',6],
+   cols:[['Код товара',0],['Старый код',12],['Наименование',1],['Ед. изм.',2],['Заказчик',3],['Кол-во',4,'n'],['Сумма, ₸ без НДС',5,'n'],['Способ закупок',6],
          ['Статус заявки',7],['Статус закупки',8],['Дата вскрытия',9,'d'],['Поставщик',10],['Дата договора',11,'d']],
    filt:[{k:'cust',l:'Заказчик',get:function(r){return split(r[3])}},{k:'meth',l:'Способ закупок',get:one(6)},
          {k:'st1',l:'Статус заявки',get:one(7)},{k:'st2',l:'Статус закупки',get:one(8)}]},
@@ -190,7 +235,7 @@ var TABS=[
      if(r[9])a.push([statusCls(r[9]),'закупка: '+r[9]]);
      if(r[10])a.push(['part',r[10]]);return a},
    det:[['Тип',0],['Заказчик (бюджет)',1],['Цена за ед., ₸ без НДС',5,'n'],['Дата заявки',7,'d'],['Способ закупок',8],['Статус закупок',9],['Статус несостоявшейся',10]],
-   cols:[['Тип',0],['Заказчик (бюджет)',1],['Код товара',2],['Наименование',3],['Кол-во',4,'n'],['Цена за ед., ₸ без НДС',5,'n'],
+   cols:[['Тип',0],['Заказчик (бюджет)',1],['Код товара',2],['Старый код',null,'old'],['Новый код',null,'new'],['Наименование',3],['Кол-во',4,'n'],['Цена за ед., ₸ без НДС',5,'n'],
          ['Сумма, ₸ без НДС',6,'n'],['Дата заявки',7,'d'],['Способ закупок',8],['Статус закупок',9],['Статус несостоявшейся',10]],
    filt:[{k:'cust',l:'Заказчик',get:one(1)},{k:'type',l:'Тип',get:one(0)},{k:'meth',l:'Способ закупок',get:one(8)},
          {k:'st',l:'Статус закупок',get:one(9)}]},
@@ -198,7 +243,7 @@ var TABS=[
    code:3,name:null,unit:null,qty:4,sum:null,search:[0,1,2,3,6],
    tags:function(r){var a=[];if(r[0])a.push(['ini',r[0]]);if(r[1])a.push(['plan',r[1]]);return a},
    det:[['АБП',0],['Цех',1],['Код ГПЗ',2],['Цена, ₸ без НДС',5,'n'],['Примечание',6]],
-   cols:[['АБП',0],['Цех',1],['Код ГПЗ',2],['Код товара',3],['Наименование',null,'name'],['Ед. изм.',null,'unit'],['Кол-во',4,'n'],
+   cols:[['АБП',0],['Цех',1],['Код ГПЗ',2],['Код товара',3],['Старый код',null,'old'],['Наименование',null,'name'],['Ед. изм.',null,'unit'],['Кол-во',4,'n'],
          ['Цена, ₸ без НДС',5,'n'],['Примечание',6]],
    filt:[{k:'abp',l:'АБП',get:one(0)},{k:'cex',l:'Цех',get:one(1)}]}
 ];
@@ -216,12 +261,12 @@ TABS.push(
    code:2,name:3,unit:4,qty:7,sum:null,search:[0,1,2,3,5,6],
    tags:function(r){var a=[];if(r[0])a.push(['ini',r[0]]);if(r[5])a.push(['plan',r[5]]);if(r[1])a.push(['date',r[1]]);return a},
    det:[['АБП',0],['Код ФП (статья)',1],['Цех',5],['Код МВЗ по SAP',6]],
-   cols:[['АБП',0],['Код ФП',1],['Код',2],['Наименование',3],['Ед. изм.',4],['Цех',5],['Код МВЗ по SAP',6],['Кол-во',7,'n']],
+   cols:[['АБП',0],['Код ФП',1],['Код',2],['Старый код',null,'old'],['Новый код',null,'new'],['Наименование',3],['Ед. изм.',4],['Цех',5],['Код МВЗ по SAP',6],['Кол-во',7,'n']],
    filt:[{k:'cex',l:'Цех',get:one(5)},{k:'art',l:'Код ФП',get:one(1)}]}
 );
 var TB={};TABS.forEach(function(t){TB[t.id]=t});
 
-var D=null,Y={},F={},H={},OPT={},CNT={},NAMES={},UNITS={};
+var D=null,Y={},F={},H={},KEYS={},OPT={},CNT={},NAMES={},UNITS={};
 var S={year:'2026',tab:'exec',q:'',f:{},limit:50,open:{}};
 try{var sy=localStorage.getItem('budget_year');if(sy&&YEARS.indexOf(sy)>=0)S.year=sy}catch(e){}
 var $q=document.getElementById('q'),$clr=document.getElementById('clr'),$main=document.getElementById('main'),
@@ -244,7 +289,7 @@ function parseQ(q){
 }
 function hit(tab,i,P){
   var T=TB[tab];
-  if(P.codes){var rr=Y[tab][i];return !!P.codes[rr[T.code]]||(T.old!=null&&!!P.codes[rr[T.old]])}
+  if(P.codes){var ks=KEYS[tab][i];for(var q=0;q<ks.length;q++)if(P.codes[ks[q]])return true;return false}
   if(P.wild){var f=F[tab][i];for(var k=0;k<f.length;k++)if(P.wild.test(f[k]))return true;return false}
   var h=H[tab][i];
   for(var j=0;j<P.toks.length;j++)if(h.indexOf(P.toks[j].s)<0)return false;
@@ -270,22 +315,25 @@ function hl(orig,toks){
 function nameOf(code){return NAMES[code]||''}
 function prep(){
   var yd=(D.years&&D.years[S.year])||{};
-  Y={};F={};H={};OPT={};CNT={};NAMES={};UNITS={};
+  Y={};F={};H={};KEYS={};OPT={};CNT={};NAMES={};UNITS={};
   TABS.forEach(function(T){Y[T.id]=(yd[T.id]&&yd[T.id].rows)||[]});
   /* названия и единицы для бюджетной заявки берём из исполнения и плана по коду товара */
   Y.plan.forEach(function(r){if(r[2]&&r[3]&&!NAMES[r[2]])NAMES[r[2]]=r[3]});
   Y.ptd.forEach(function(r){if(validCode(r[0])&&r[2]&&!NAMES[r[0]])NAMES[r[0]]=r[2]});
   Y.uzheo.forEach(function(r){if(validCode(r[2])&&r[3]&&!NAMES[r[2]])NAMES[r[2]]=r[3]});
   Y.exec.forEach(function(r){if(r[0]&&r[1])NAMES[r[0]]=r[1];if(r[0]&&r[2])UNITS[r[0]]=r[2]});
+  buildAlt();
   TABS.forEach(function(T){
     var rows=Y[T.id];
-    F[T.id]=rows.map(function(r){
+    KEYS[T.id]=rows.map(function(r){return codeKeys(T,r)});
+    F[T.id]=rows.map(function(r,i){
       var f=T.search.map(function(c){return norm(r[c])});
       if(T.name==null)f.push(norm(nameOf(r[T.code])));
+      KEYS[T.id][i].forEach(function(k){f.push(norm(k))});
       return f;
     });
     H[T.id]=F[T.id].map(function(f){return f.join(' ')});
-    CNT[T.id]={};rows.forEach(function(r){codeKeys(T,r).forEach(function(c){CNT[T.id][c]=(CNT[T.id][c]||0)+1})});
+    CNT[T.id]={};KEYS[T.id].forEach(function(ks){ks.forEach(function(c){CNT[T.id][c]=(CNT[T.id][c]||0)+1})});
     OPT[T.id]=T.filt.map(function(fl){
       var cnt={};rows.forEach(function(r){fl.get(r).forEach(function(v){cnt[v]=(cnt[v]||0)+1})});
       return Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a]||(a<b?-1:1)});
@@ -302,27 +350,50 @@ function yearInfo(y){
 function tcell(x){return String(x==null?'':x).replace(/[\t\r\n]+/g,' ').trim()}
 function tnum(x){return String(Math.round(x*1000)/1000).replace('.',',')}
 function buildTable(T,idx){
-  var rows=[T.cols.map(function(c){return c[0]})];
+  var rows=[];
   idx.forEach(function(i){
-    var r=Y[T.id][i];
+    var r=Y[T.id][i],a=altInfo(T,r);
     rows.push(T.cols.map(function(c){
       if(c[2]==='name')return nameOf(r[T.code]);
       if(c[2]==='unit')return UNITS[r[T.code]]||'';
+      if(c[2]==='old')return a&&a.lab==='ст. код'?a.codes.join('; '):'';
+      if(c[2]==='new')return a&&a.lab==='нов. код'?a.codes.join('; '):'';
       var v=r[c[1]];
       return c[2]==='n'?tnum(v):c[2]==='d'?fdate(v):v;
     }));
   });
-  return rows.map(function(r){return r.map(tcell).join('\t')}).join('\n');
+  /* колонки, в которых у найденных строк ничего нет, в таблицу не берём */
+  var keep=T.cols.map(function(c,k){
+    if(c[0]==='Кол-во')return true;
+    return rows.some(function(r){var v=String(r[k]==null?'':r[k]).trim();return v!==''&&v!=='0'});
+  });
+  var head=T.cols.map(function(c){return c[0]}).filter(function(_,k){return keep[k]});
+  var body=rows.map(function(r){return r.filter(function(_,k){return keep[k]})});
+  return [head].concat(body).map(function(r){return r.map(tcell).join('\t')}).join('\n');
 }
-function copyText(text,btn){
-  function done(ok){var old=btn.getAttribute('data-label');btn.textContent=ok?'Скопировано ✓ (строк: '+S.copyN+')':'Не удалось скопировать';btn.classList.toggle('done',ok);
-    setTimeout(function(){btn.textContent=old;btn.classList.remove('done')},2200)}
+var ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>';
+var ICON_OK='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+function copyRaw(text,cb){
   function fallback(){
     var ta=document.createElement('textarea');ta.value=text;ta.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.appendChild(ta);ta.select();
-    var ok=false;try{ok=document.execCommand('copy')}catch(e){}document.body.removeChild(ta);done(ok);
+    var ok=false;try{ok=document.execCommand('copy')}catch(e){}document.body.removeChild(ta);cb(ok);
   }
-  if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(text).then(function(){done(true)},fallback);else fallback();
+  if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(text).then(function(){cb(true)},fallback);else fallback();
 }
+function copyText(text,btn,okMsg){
+  copyRaw(text,function(ok){
+    var old=btn.getAttribute('data-label');btn.textContent=ok?okMsg:'Не удалось скопировать';btn.classList.toggle('done',ok);
+    setTimeout(function(){btn.textContent=old;btn.classList.remove('done')},2200);
+  });
+}
+function copyIcon(btn,text){
+  copyRaw(text,function(ok){
+    btn.innerHTML=ok?ICON_OK:ICON;btn.classList.toggle('done',ok);
+    if(ok){btn.title='Скопировано';setTimeout(function(){btn.innerHTML=ICON;btn.classList.remove('done');btn.title='Копировать код'},1300)}
+  });
+}
+function copyBtn(code){return '<button class="cp" data-cc="'+esc(code)+'" title="Копировать код" aria-label="Копировать код '+esc(code)+'">'+ICON+'</button>'}
+function hasSel(){var s=window.getSelection&&window.getSelection();return !!(s&&String(s).length)}
 
 /* ---------- фильтры и вывод ---------- */
 function filtered(tab,P,withFilters){
@@ -384,17 +455,19 @@ function det(T,r){
   return h;
 }
 function card(T,i,P){
-  var r=Y[T.id][i],id=T.id+':'+i,code=codeShow(T,r),
-      name=T.name!=null?r[T.name]:nameOf(code),
-      u=T.unit!=null?r[T.unit]:UNITS[r[T.code]]||'';
-  var h='<div class="g'+(S.open[id]?' open':'')+'" data-id="'+id+'"><button class="gm" data-row="'+id+'"><div class="gh"><div class="l">'+
-    '<span class="code'+(code?'':' nc')+'">'+(code?hl(code,P.toks):'без кода')+'</span>'+
+  var r=Y[T.id][i],id=T.id+':'+i,code=codeRaw(T,r),fromOld=code&&!validCode(r[T.code]),
+      name=T.name!=null?r[T.name]:nameOf(r[T.code]),
+      u=T.unit!=null?r[T.unit]:UNITS[r[T.code]]||'',a=altInfo(T,r);
+  var h='<div class="g'+(S.open[id]?' open':'')+'" data-id="'+id+'"><div class="gm" role="button" tabindex="0" data-row="'+id+'"><div class="gh"><div class="l">'+
+    '<div class="cl"><span class="code'+(code?(fromOld?' old':''):' nc')+'">'+(code?hl(code,P.toks):'без кода')+'</span>'+(code?copyBtn(code):'')+
+    (fromOld?'<span class="oldc"><i>(старый код)</i></span>':'')+
+    (a?'<span class="oldc"><i>'+a.lab+'</i>'+a.codes.map(function(c){return '<span class="code old">'+hl(c,P.toks)+'</span>'+copyBtn(c)}).join(' ')+'</span>':'')+'</div>'+
     '<p class="name'+(name?'':' dim')+'">'+(name?hl(name,P.toks):'наименование не указано')+'</p></div>'+
     '<div class="qty"><b>'+fmt(r[T.qty])+'</b>'+(u?'<i>'+esc(u)+'</i>':'')+
     (T.sum!=null&&r[T.sum]?'<small>'+fmt(r[T.sum],0)+' ₸</small>':'')+'</div></div>';
   var tg=T.tags(r);
   if(tg.length)h+='<div class="tags">'+tg.map(function(t){return '<span class="tag '+t[0]+'">'+hl(t[1],P.toks)+'</span>'}).join('')+'</div>';
-  h+='</button><div class="det">'+det(T,r)+'</div></div>';
+  h+='</div><div class="det">'+det(T,r)+'</div></div>';
   return h;
 }
 function renderMain(P){
@@ -418,7 +491,11 @@ function renderMain(P){
     stat+=' · сумма <b>'+fmt(t,0)+' ₸</b> без НДС';
     if(T.sumNote&&withSum<idx.length)stat+=' <span title="У остальных строк цена не указана">(указана у '+fmt(withSum,0)+' из '+fmt(idx.length,0)+')</span>'}
   S.copyText=buildTable(T,idx);S.copyN=idx.length;
-  var html='<div class="lhead"><div class="stat">'+stat+'</div><button class="copybtn" data-copy data-label="Скопировать для Excel">Скопировать для Excel</button></div>',lim=Math.min(S.limit,idx.length);
+  var seen={},codes=[];idx.forEach(function(i){var c=codeRaw(T,rows[i]);if(c&&!seen[c]){seen[c]=1;codes.push(c)}});
+  S.copyCodes=codes.join('\n');S.copyCodesN=codes.length;
+  var html='<div class="lhead"><div class="stat">'+stat+'</div><div class="cbtns">'+
+    '<button class="copybtn" data-copy data-label="Скопировать для Excel">Скопировать для Excel</button>'+
+    '<button class="copybtn alt" data-copycodes data-label="Скопировать коды">Скопировать коды</button></div></div>',lim=Math.min(S.limit,idx.length);
   for(var k=0;k<lim;k++)html+=card(T,idx[k],P);
   if(lim<idx.length)html+='<button class="more" data-more>Показать ещё ('+fmt(idx.length-lim,0)+')</button>';
   $main.innerHTML=html;
@@ -472,12 +549,30 @@ $ctl.addEventListener('change',function(e){
 $main.addEventListener('click',function(e){
   var t=e.target,go=t.closest('[data-go]');
   if(go){S.tab=go.getAttribute('data-go');S.f={};S.limit=50;setQ(go.getAttribute('data-q'));window.scrollTo(0,0);return}
+  var cc=t.closest('[data-cc]');
+  if(cc){e.stopPropagation();copyIcon(cc,cc.getAttribute('data-cc'));return}
   var cp=t.closest('[data-copy]');
-  if(cp){copyText(S.copyText||'',cp);return}
+  if(cp){copyText(S.copyText||'',cp,'Скопировано ✓ (строк: '+S.copyN+')');return}
+  var cq=t.closest('[data-copycodes]');
+  if(cq){
+    if(!S.copyCodesN){cq.textContent='Нет кодов';setTimeout(function(){cq.textContent=cq.getAttribute('data-label')},1800);return}
+    copyText(S.copyCodes||'',cq,'Скопировано ✓ (кодов: '+S.copyCodesN+')');return}
   if(t.closest('[data-reset]')){S.f={};setQ('');return}
   if(t.closest('[data-more]')){S.limit+=50;render();return}
   var r=t.closest('[data-row]');
-  if(r){var id=r.getAttribute('data-row');S.open[id]=!S.open[id];r.parentNode.classList.toggle('open',!!S.open[id])}
+  if(r){
+    /* чтобы текст можно было выделять мышью: карточка раскрывается только по простому щелчку без выделения */
+    clearTimeout(rowTimer);
+    if(e.detail>1||hasSel())return;
+    if(coarse){toggleRow(r);return}
+    rowTimer=setTimeout(function(){if(!hasSel())toggleRow(r)},230);
+  }
+});
+var rowTimer=null,coarse=!!(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches);
+function toggleRow(r){var id=r.getAttribute('data-row');S.open[id]=!S.open[id];r.parentNode.classList.toggle('open',!!S.open[id])}
+$main.addEventListener('keydown',function(e){
+  var r=e.target.closest&&e.target.closest('[data-row]');
+  if(r&&e.target===r&&(e.key==='Enter'||e.key===' ')){e.preventDefault();toggleRow(r)}
 });
 window.addEventListener('scroll',function(){$up.classList.toggle('on',window.scrollY>600)},{passive:true});
 $up.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'})});
